@@ -6,7 +6,7 @@ cmd="curl -s"
 
 # add auth token in CI environment
 if [ -n "$GITHUB_API_TOKEN" ]; then
- cmd="$cmd -H 'Authorization: token $GITHUB_API_TOKEN'"
+  cmd="$cmd -H 'Authorization: token $GITHUB_API_TOKEN'"
 fi
 
 cmd="$cmd $releases_path"
