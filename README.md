@@ -38,6 +38,6 @@ You can specify a non-default location of this file by setting a `ASDF_CRATE_DEF
 `asdf-rust` will interactively ask you whether you want to install specific rust components (`rustup --component <components>`).  
 Or it will default to the content of `$ASDF_RUST_DEFAULT_COMPONENTS` (`$HOME/.default-rust-components`).
 
-### Default rust components
+### Default rust targets
 `asdf-rust` will interactively ask you whether you want to install specific rust targets (`rustup --target <targets>`).  
 Or it will default to the content of `$ASDF_RUST_DEFAULT_TARGETS` (`$HOME/.default-rust-targets`).
