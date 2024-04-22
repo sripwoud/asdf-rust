@@ -68,8 +68,7 @@ install_rust() {
       --component "${components[@]}" \
       --default-toolchain "$ASDF_INSTALL_VERSION" \
       --profile "${ASDF_RUST_PROFILE:-default}" \
-      --target "${targets[@]}" \
-      -v
+      --target "${targets[@]}"
 }
 
 install_cargo_crate() {
