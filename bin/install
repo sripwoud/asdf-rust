@@ -1,84 +1,95 @@
 #!/usr/bin/env bash
 
 script_dir=$(dirname "${BASH_SOURCE[0]}")
-# shellcheck source=/dev/null
 . "$script_dir/exec-env"
+
+GREEN=$'\e[0;32m'
+BROWN=$'\e[0;33m'
+RED=$'\e[0;31m'
+RESET=$'\e[0m'
+
+print_color() {
+  local color="$1"
+  local message="$2"
+  printf "%s%s%s\n" "$color" "$message" "$RESET"
+}
+
+print_green() { print_color "$GREEN" "$1"; }
+print_brown() { print_color "$BROWN" "$1"; }
+print_red() { print_color "$RED" "$1"; }
 
 ask_user() {
   local question="$1"
-  local -n options_ref="$2"
+  local defaults="$2"
   local answer
 
-  if [[ -z ${options_ref[*]} ]]; then
-    read -r -p "$question [Y/n]" answer
+  if [[ -z $defaults ]]; then
+    read -r -p "$question [Y/n]" answer >&3
     case $answer in
-    [nN]) printf "no" ;;
-    *) printf "yes" ;;
+    [yY]) answer="yes" ;;
+    *) answer="no" ;;
     esac
   else
-    read -r -p "$question y/n/[${options_ref[*]}]" answer
+    printf "%s" "$question y/n/[$BROWN$defaults$RESET]" >&3
+    read -r answer
     case $answer in
-    [yY]) printf "yes" ;;
-    [nN]) printf "no" ;;
-    *) return ;;
+    [yY]) answer="yes" ;;
+    [nN]) answer="no" ;;
+    *) answer="default" ;;
     esac
   fi
+
+  printf %s "$answer"
 }
 
-read_file() {
-  local file="$1"
-  local -n options_ref="$2"
-
-  [[ ! -f $file ]] && return
-  mapfile -t options_ref <"$file"
-}
+read_options_file() { [[ -f $1 ]] && tr '\n' ' ' <"$1" | sed 's/ $//'; }
 
 get_options() {
   local option_name="$1"
   local default_options_file_path="$2"
-  local -n array_ref="$3"
+  local default_options
+  local options
+  default_options=$(read_options_file "$default_options_file_path")
+  answer=$(ask_user "Define specific $option_name(s) to install?" "$default_options")
 
-  read_file "$default_options_file_path" array_ref
-  ask_user "Define specific $option_name(s) to install?" array_ref
-
-  # shellcheck disable=SC2034
-  case $options in
-  "yes") read -r -p "Enter $option_name(s) (${option_name}1 ${option_name}2 ...): " -a array_ref ;;
-  "no") options=() ;;
-  *) return ;;
+  case "$answer" in
+  "yes") read -r -p "Enter $option_name(s) (${option_name}1 ${option_name}2 ...): " options >&3 ;;
+  "no") options="" ;;
+  *) options="$default_options" ;;
   esac
+
+  printf %s "$options"
 }
 
 install_rust() {
   local default_rust_components="${ASDF_RUST_DEFAULT_COMPONENTS_FILE:=$HOME/.default-rust-components}"
   local default_rust_targets="${ASDF_RUST_DEFAULT_TARGETS_FILE:=$HOME/.default-rust-targets}"
-  local components=()
-  local targets=()
+  local components
+  local targets
 
-  get_options "component" "$default_rust_components" components
-  get_options "target" "$default_rust_targets" targets
+  exec 3>/dev/tty
+  components=$(get_options "component" "$default_rust_components")
+  targets=$(get_options "target" "$default_rust_targets")
+  exec 3>&-
 
-  printf "Installing Rust\n"
-  [[ ${#components[@]} ]] && printf "with components: \033[33m%s\033[39m\n" "${components[*]}"
-  [[ ${#targets[@]} ]] && printf "with targets: \033[33m%s\033[39m\n" "${targets[*]}"
+  printf "Installing Rust\n%s\n%s\n" \
+    "${components:+with components: ${BROWN}$components${RESET}}" \
+    "${targets:+with targets: ${BROWN}$targets${RESET}}"
 
-  # shellcheck disable=SC2086
   curl --fail --silent --show-error https://sh.rustup.rs |
     sh -s -- -y --no-modify-path \
-      --component "${components[@]}" \
       --default-toolchain "$ASDF_INSTALL_VERSION" \
       --profile "${ASDF_RUST_PROFILE:-default}" \
-      --target "${targets[@]}"
+      ${components:+--component $components} \
+      ${targets:+--target $targets}
 }
 
 install_cargo_crate() {
-  printf "\nInstalling \033[33m%s\033[39m cargo crate... " "$1"
-  # shellcheck disable=SC2086
+  printf "\n%s%s%s\n" "Installing " "$(print_brown "$1")" " cargo crate..."
   PATH="$ASDF_INSTALL_PATH/bin:$PATH" cargo install "$@" >/dev/null && rc=$? || rc=$?
 
-  [[ $rc -ne 0 ]] && printf "\033[31mFAIL\033[39m\n"
-  printf "\033[32mSUCCESS\033[39m\n"
-
+  [[ $rc -ne 0 ]] && print_red "FAILED"
+  print_greeen "SUCCESS"
 }
 
 install_default_cargo_crates() {
@@ -99,5 +110,9 @@ install_default_cargo_crates() {
   done <"$default_cargo_crates"
 }
 
-install_rust
-install_default_cargo_crates
+main() {
+  install_rust
+  install_default_cargo_crates
+}
+
+main
