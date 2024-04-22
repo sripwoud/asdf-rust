@@ -89,7 +89,7 @@ install_cargo_crate() {
   PATH="$ASDF_INSTALL_PATH/bin:$PATH" cargo install "$@" >/dev/null && rc=$? || rc=$?
 
   [[ $rc -ne 0 ]] && print_red "FAILED"
-  print_greeen "SUCCESS"
+  print_green "SUCCESS"
 }
 
 install_default_cargo_crates() {
