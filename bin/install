@@ -39,7 +39,7 @@ get_options() {
   local -n array_ref="$3"
 
   read_file "$default_options_file_path" array_ref
-  ask_user "Define specifc $option_name(s) to install?" array_ref
+  ask_user "Define specific $option_name(s) to install?" array_ref
 
   # shellcheck disable=SC2034
   case $options in
