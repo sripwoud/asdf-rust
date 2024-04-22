@@ -5,66 +5,80 @@ script_dir=$(dirname "${BASH_SOURCE[0]}")
 . "$script_dir/exec-env"
 
 ask_user() {
-  local question=$1
-  local default=$2
+  local question="$1"
+  local -n options_ref="$2"
   local answer
 
-  if [[ -z $default ]]; then
+  if [[ -z ${options_ref[*]} ]]; then
     read -r -p "$question [Y/n]" answer
     case $answer in
     [nN]) printf "no" ;;
     *) printf "yes" ;;
     esac
   else
-    read -r -p "$question y/n/[$default] " answer
-    printf %s "$answer"
+    read -r -p "$question y/n/[${options_ref[*]}]" answer
+    case $answer in
+    [yY]) printf "yes" ;;
+    [nN]) printf "no" ;;
+    *) return ;;
+    esac
   fi
 }
 
 read_file() {
-  [[ -f $1 ]] && tr '\n' ' ' <"$1"
+  local file="$1"
+  local -n options_ref="$2"
+
+  [[ ! -f $file ]] && return
+  mapfile -t options_ref < "$file"
 }
 
 get_options() {
   local option_name="$1"
   local default_options_file_path="$2"
-  local default_options
-  local options
+  local -n array_ref="$3"
 
-  default_options=$(read_file "$default_options_file_path")
-  options=$(ask_user "Define specifc $option_name(s) to install?" "$default_options")
+  read_file "$default_options_file_path" array_ref
+  ask_user "Define specifc $option_name(s) to install?" array_ref
 
+  # shellcheck disable=SC2034
   case $options in
-  "yes") read -r -p "Enter $option_name(s) (${option_name}1 ${option_name}2 ...): " options ;;
-  "no") options="" ;;
-  *) printf %s "$options" ;;
+  "yes") read -r -p "Enter $option_name(s) (${option_name}1 ${option_name}2 ...): " -a array_ref ;;
+  "no") options=() ;;
+  *) return ;;
   esac
 }
 
 install_rust() {
   local default_rust_components="${ASDF_RUST_DEFAULT_COMPONENTS_FILE:=$HOME/.default-rust-components}"
   local default_rust_targets="${ASDF_RUST_DEFAULT_TARGETS_FILE:=$HOME/.default-rust-targets}"
+  local components=()
+  local targets=()
 
-  local components
-  local targets
-  components=$(get_options "component" "$default_rust_components")
-  targets=$(get_options "target" "$default_rust_targets")
+  get_options "component" "$default_rust_components" components
+  get_options "target" "$default_rust_targets" targets
 
+  printf "Installing Rust\n"
+  [[ ${#components[@]} ]] && printf "with components: \033[33m%s\033[39m\n" "${components[*]}"
+  [[ ${#targets[@]} ]] && printf "with targets: \033[33m%s\033[39m\n" "${targets[*]}"
+
+  # shellcheck disable=SC2086
   curl --fail --silent --show-error https://sh.rustup.rs |
     sh -s -- -y --no-modify-path \
-      --component "${components}" \
+      --component "${components[@]}" \
       --default-toolchain "$ASDF_INSTALL_VERSION" \
       --profile "${ASDF_RUST_PROFILE:-default}" \
-      --target "${targets}"
+      --target "${targets[@]}" \
+      -v
 }
 
 install_cargo_crate() {
-    printf "\nInstalling \033[33m%s\033[39m cargo crate... " "$1"
-    # shellcheck disable=SC2086
-    PATH="$ASDF_INSTALL_PATH/bin:$PATH" cargo install $1 >/dev/null && rc=$? || rc=$?
+  printf "\nInstalling \033[33m%s\033[39m cargo crate... " "$1"
+  # shellcheck disable=SC2086
+  PATH="$ASDF_INSTALL_PATH/bin:$PATH" cargo install $1 >/dev/null && rc=$? || rc=$?
 
-    [[ $rc -eq 0 ]] && printf "\033[32mSUCCESS\033[39m"
-    printf "\033[31mFAIL\033[39m"
+  [[ $rc -ne 0 ]] && printf "\033[31mFAIL\033[39m\n"
+  printf "\033[32mSUCCESS\033[39m\n"
 
 }
 
@@ -81,7 +95,6 @@ install_default_cargo_crates() {
     [[ -z $name ]] && continue
     # shellcheck disable=SC2086
     install_cargo_crate $name
-
 
   done <"$default_cargo_crates"
 }
