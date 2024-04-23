@@ -1,3 +1,21 @@
+I initially forked  [asdf-rust](https://github.com/code-lever/asdf-rust) because I wanted to automate adding specific components and targets to my rust installation.  
+Until I realized this is overkill; one can simply use an [asdf plugin hook](https://asdf-vm.com/manage/configuration.html#plugin-hooks) instead:
+
+`post_asdf_install_rust` (make it executable: `chmod +x post_asdf_install_rust`)
+``` shell
+#!/bin/bash
+
+export RUSTUP_HOME="$XDG_DATA_HOME/asdf/installs/rust/$1"
+rustup component add rust-analyzer rust-src
+rustup target add wasm32-unknown-unknown
+
+```
+
+`$ASDF_CONFIG_FILE`
+```
+post_asdf_install_rust = "$XDG_CONFIG_HOME/asdf/post_asdf_install_rust" $1
+```
+
 # asdf-rust
 
 
